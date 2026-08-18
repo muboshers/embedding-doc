@@ -1,1 +1,139 @@
-Embedder service HTTP service wrapping the BGE-M3 embedding model. It turns text into vectors for storage and search in a vector database. The service returns both representations produced by BGE-M3: dense — a 1024-dimensional vector capturing semantic meaning sparse — token weights used for keyword matching Model: BAAI/bge-m3. Base URL http://10.0.0.181:6002 The service is available only from networks that can reach 10.0.0.181. Internal requests should bypass the corporate proxy. For command-line requests, use: curl --noproxy '*' ... For Python httpx, use: trust_env=False GET /health Checks whether the service is available and the model is loaded. curl --noproxy '*' http://10.0.0.181:6002/health Expected response: {   "status": "ok",   "device": "cuda:0",   "model": "BAAI/bge-m3" } POST /embed Creates embeddings for multiple texts. Use this endpoint when indexing documents. Request Content type: application/json. Field	Type	Required	Description texts	array of strings	yes	Texts to embed Example: curl --noproxy '*' -X POST http://10.0.0.181:6002/embed \   -H 'Content-Type: application/json' \   -d '{"texts": ["first document", "second document"]}' Response The response contains one embedding object per input text, in the same order as the texts array. {   "embeddings": [     {       "dense": [0.021, -0.043, "..."],       "sparse": {         "indices": [4865, 9207],         "values": [0.31, 0.22]       }     },     {       "dense": [0.018, -0.051, "..."],       "sparse": {         "indices": [4865, 1130],         "values": [0.29, 0.18]       }     }   ] } POST /embed_query Creates an embedding for one search query. Use this endpoint when searching the vector database. Request Content type: application/json. Field	Type	Required	Description text	string	yes	Query text to embed Example: curl --noproxy '*' -X POST http://10.0.0.181:6002/embed_query \   -H 'Content-Type: application/json' \   -d '{"text": "how do I reset my password"}' Response The endpoint returns one embedding object directly, without an embeddings array wrapper. {   "dense": [0.031, -0.012, "..."],   "sparse": {     "indices": [2044, 7781],     "values": [0.42, 0.19]   } } Python example import httpx  BASE_URL = "http://10.0.0.181:6002"   def embed_documents(texts: list[str]) -> list[dict]:     response = httpx.post(         f"{BASE_URL}/embed",         json={"texts": texts},         timeout=120,         trust_env=False,     )     response.raise_for_status()     return response.json()["embeddings"]   def embed_query(text: str) -> dict:     response = httpx.post(         f"{BASE_URL}/embed_query",         json={"text": text},         timeout=60,         trust_env=False,     )     response.raise_for_status()     return response.json()   document_embeddings = embed_documents([     "first document",     "second document", ])  query_embedding = embed_query("how do I reset my password") Usage recommendations Use /embed for indexing documents and /embed_query for search queries. Send a few dozen texts per /embed request to keep memory usage predictable. Keep the returned dense and sparse representations together for hybrid search. Use a longer timeout for document batches than for individual queries. Treat the order of the /embed response as matching the order of the input texts array.
+Embedder service
+HTTP service wrapping the BGE-M3 embedding model. It turns text into vectors
+for storage and search in a vector database.
+The service returns both representations produced by BGE-M3:
+dense — a 1024-dimensional vector capturing semantic meaning
+sparse — token weights used for keyword matching
+Model: `BAAI/bge-m3`.
+Base URL
+```text
+http://10.0.0.181:6002
+```
+The service is available only from networks that can reach `10.0.0.181`.
+Internal requests should bypass the corporate proxy.
+For command-line requests, use:
+```bash
+curl --noproxy '*' ...
+```
+For Python `httpx`, use:
+```python
+trust_env=False
+```
+GET /health
+Checks whether the service is available and the model is loaded.
+```bash
+curl --noproxy '*' http://10.0.0.181:6002/health
+```
+Expected response:
+```json
+{
+  "status": "ok",
+  "device": "cuda:0",
+  "model": "BAAI/bge-m3"
+}
+```
+POST /embed
+Creates embeddings for multiple texts. Use this endpoint when indexing
+documents.
+Request
+Content type: `application/json`.
+Field	Type	Required	Description
+`texts`	array of strings	yes	Texts to embed
+Example:
+```bash
+curl --noproxy '*' -X POST http://10.0.0.181:6002/embed \
+  -H 'Content-Type: application/json' \
+  -d '{"texts": ["first document", "second document"]}'
+```
+Response
+The response contains one embedding object per input text, in the same order as
+the `texts` array.
+```json
+{
+  "embeddings": [
+    {
+      "dense": [0.021, -0.043, "..."],
+      "sparse": {
+        "indices": [4865, 9207],
+        "values": [0.31, 0.22]
+      }
+    },
+    {
+      "dense": [0.018, -0.051, "..."],
+      "sparse": {
+        "indices": [4865, 1130],
+        "values": [0.29, 0.18]
+      }
+    }
+  ]
+}
+```
+POST /embed_query
+Creates an embedding for one search query. Use this endpoint when searching
+the vector database.
+Request
+Content type: `application/json`.
+Field	Type	Required	Description
+`text`	string	yes	Query text to embed
+Example:
+```bash
+curl --noproxy '*' -X POST http://10.0.0.181:6002/embed_query \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "how do I reset my password"}'
+```
+Response
+The endpoint returns one embedding object directly, without an `embeddings`
+array wrapper.
+```json
+{
+  "dense": [0.031, -0.012, "..."],
+  "sparse": {
+    "indices": [2044, 7781],
+    "values": [0.42, 0.19]
+  }
+}
+```
+Python example
+```python
+import httpx
+
+BASE_URL = "http://10.0.0.181:6002"
+
+
+def embed_documents(texts: list[str]) -> list[dict]:
+    response = httpx.post(
+        f"{BASE_URL}/embed",
+        json={"texts": texts},
+        timeout=120,
+        trust_env=False,
+    )
+    response.raise_for_status()
+    return response.json()["embeddings"]
+
+
+def embed_query(text: str) -> dict:
+    response = httpx.post(
+        f"{BASE_URL}/embed_query",
+        json={"text": text},
+        timeout=60,
+        trust_env=False,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+document_embeddings = embed_documents([
+    "first document",
+    "second document",
+])
+
+query_embedding = embed_query("how do I reset my password")
+```
+Usage recommendations
+Use `/embed` for indexing documents and `/embed_query` for search queries.
+Send a few dozen texts per `/embed` request to keep memory usage predictable.
+Keep the returned dense and sparse representations together for hybrid
+search.
+Use a longer timeout for document batches than for individual queries.
+Treat the order of the `/embed` response as matching the order of the input
+`texts` array.
